@@ -18,7 +18,7 @@ export const metadata = {
     siteName: "Flow Swap",
   },
   icons: {
-    icon: "/favicon.png",
+    icon: "/favicon.ico",
   },
     generator: 'v0.app'
 }
