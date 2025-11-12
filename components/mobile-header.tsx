@@ -10,12 +10,10 @@ export default function MobileHeader() {
   const pathname = usePathname()
 
   const navItems = [
-    { name: "Home", href: "/" },
-    { name: "Swap", href: "/swap" },
+    { name: "Swap", href: "/" },
     { name: "Ghost-Swap", href: "/ghost-swap" },
     { name: "Transactions", href: "/transactions" },
-    { name: "Analyzer", href: "/analyzer" },
-    { name: "About Us", href: "/about" },
+    { name: "Analytics", href: "/analytics" },
   ]
 
   return (

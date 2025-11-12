@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { ArrowLeftRight, Layers, Ghost, Clock, Layers3, FileText, Twitter, BarChart3, Home } from "lucide-react"
+import { ArrowLeftRight, Layers, Ghost, Clock, Layers3, FileText, Twitter, BarChart3 } from "lucide-react"
 
 // Custom active link styles with animation and glow effect
 const activeLinkClass =
@@ -22,20 +22,8 @@ export default function Sidebar() {
                 pathname === "/" ? activeLinkClass : "text-gray-400 hover:text-white hover:bg-gray-800/20"
               } px-4 py-2 rounded-lg transition-colors`}
             >
-              <Home
-                className={`mr-3 h-5 w-5 transition-transform duration-300 ${pathname === "/" ? "scale-110" : ""}`}
-              />
-              <span>Home</span>
-            </Link>
-
-            <Link
-              href="/swap"
-              className={`flex items-center relative overflow-hidden transition-all duration-300 ${
-                pathname === "/swap" ? activeLinkClass : "text-gray-400 hover:text-white hover:bg-gray-800/20"
-              } px-4 py-2 rounded-lg transition-colors`}
-            >
               <ArrowLeftRight
-                className={`mr-3 h-5 w-5 transition-transform duration-300 ${pathname === "/swap" ? "scale-110" : ""}`}
+                className={`mr-3 h-5 w-5 transition-transform duration-300 ${pathname === "/" ? "scale-110" : ""}`}
               />
               <span>Swap</span>
             </Link>
