@@ -17,7 +17,6 @@ import TokenSelector from "@/components/token-selector"
 import Sidebar from "@/components/sidebar"
 import TransactionModal from "@/components/transaction-modal"
 import HeroGeometric from "@/components/hero-geometric"
-import TokenDataSection from "@/components/token-data-section"
 import MentexSection from "@/components/mentex-section"
 import Header from "@/components/header"
 import IntroAnimation from "@/components/intro-animation"
@@ -27,13 +26,13 @@ export default function SwapPage() {
   const [showIntro, setShowIntro] = useState(true)
   const [contentReady, setContentReady] = useState(false)
   const [fromToken, setFromToken] = useState({
-    id: "ethereum",
+    id: "eth",
     symbol: "ETH",
     name: "Ethereum",
     image: "https://assets.coingecko.com/coins/images/279/large/ethereum.png",
   })
   const [toToken, setToToken] = useState({
-    id: "bitcoin",
+    id: "btc",
     symbol: "BTC",
     name: "Bitcoin",
     image: "https://assets.coingecko.com/coins/images/1/large/bitcoin.png",
@@ -69,79 +68,79 @@ export default function SwapPage() {
     }, 100)
   }
 
-  // Calculate minimum token amount based on current price
-  const calculateMinimumAmount = useCallback(() => {
-    if (fromRate <= 0) return
-
-    // Calculate how many tokens equal $10 USD
-    const minAmount = minimumUsdAmount / fromRate
-    setMinimumTokenAmount(minAmount)
-
-    // Update the displayed minimum amount text
-    setMinimumAmount(`${minAmount.toFixed(6)} ${fromToken.symbol.toUpperCase()}`)
-
-    // Check if current amount is below minimum
-    const numFromAmount = Number.parseFloat(fromAmount) || 0
-    if (numFromAmount > 0 && numFromAmount < minAmount) {
-      setShowMinimumWarning(true)
-    } else {
-      setShowMinimumWarning(false)
+  // Get minimum amount from ChangeNOW
+  const fetchMinimumAmount = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/changenow/min-amount?from=${fromToken.id}&to=${toToken.id}`)
+      const data = await res.json()
+      
+      if (data.minAmount) {
+        const minAmount = parseFloat(data.minAmount)
+        setMinimumTokenAmount(minAmount)
+        setMinimumAmount(`${minAmount} ${fromToken.symbol.toUpperCase()}`)
+        
+        // Check if current amount is below minimum
+        const numFromAmount = parseFloat(fromAmount) || 0
+        if (numFromAmount > 0 && numFromAmount < minAmount) {
+          setShowMinimumWarning(true)
+        } else {
+          setShowMinimumWarning(false)
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching minimum amount:", error)
+      // Fallback to a default minimum
+      setMinimumTokenAmount(0.001)
+      setMinimumAmount(`0.001 ${fromToken.symbol.toUpperCase()}`)
     }
-  }, [fromRate, fromToken.symbol, fromAmount, minimumUsdAmount])
+  }, [fromToken.id, toToken.id, fromToken.symbol, fromAmount])
 
-  // Fetch exchange rates
-  const fetchRates = useCallback(
-    async (customFromToken = null, customToToken = null) => {
+  // Get ChangeNOW estimate for swap
+  const fetchEstimate = useCallback(
+    async (customFromToken = null, customToToken = null, amount = fromAmount) => {
       const sourceToken = customFromToken || fromToken
       const targetToken = customToToken || toToken
 
-      if (sourceToken.id === targetToken.id) {
+      if (sourceToken.id === targetToken.id || !amount || parseFloat(amount) <= 0) {
         return
       }
 
       setIsLoading(true)
 
       try {
-        // Add cache-busting parameter to avoid cached responses
         const timestamp = Date.now()
-        const res = await fetch(`/api/exchange-rate?from=${sourceToken.id}&to=${targetToken.id}&_=${timestamp}`, {
-          cache: "no-store",
-          headers: {
-            "Cache-Control": "no-cache",
-            Pragma: "no-cache",
-          },
-        })
+        const res = await fetch(
+          `/api/changenow/estimate?from=${sourceToken.id}&to=${targetToken.id}&amount=${amount}&_=${timestamp}`,
+          {
+            cache: "no-store",
+            headers: {
+              "Cache-Control": "no-cache",
+              Pragma: "no-cache",
+            },
+          }
+        )
 
         if (!res.ok) {
           const errorData = await res.json().catch(() => ({}))
-          throw new Error(errorData.message || `API responded with status: ${res.status}`)
+          throw new Error(errorData.message || `ChangeNOW API responded with status: ${res.status}`)
         }
 
         const data = await res.json()
 
-        // Check if the response contains an error
         if (data.error) {
-          throw new Error(data.message || "Failed to fetch exchange rates")
+          throw new Error(data.message || "Failed to get exchange estimate")
         }
 
-        // Update rates
-        if (data[sourceToken.id]?.usd) {
-          setFromRate(data[sourceToken.id].usd)
+        // Update the estimated amount
+        if (data.estimatedAmount) {
+          setToAmount(parseFloat(data.estimatedAmount))
         }
 
-        if (data[targetToken.id]?.usd) {
-          setToRate(data[targetToken.id].usd)
-        }
-
-        // Update last updated timestamp
         setLastUpdated(new Date())
         setFetchError(false)
         setErrorMessage("")
         setUsingFallbackRates(false)
         setIsTokenChanging(false)
-
-        // Calculate minimum amount after rates are updated
-        calculateMinimumAmount()
 
         // Clear any retry timeout
         if (retryTimeoutRef.current) {
@@ -149,20 +148,10 @@ export default function SwapPage() {
           retryTimeoutRef.current = null
         }
       } catch (error) {
-        console.error("Error fetching rates:", error)
+        console.error("Error getting ChangeNOW estimate:", error)
         setFetchError(true)
-
-        // Set a more user-friendly error message for rate limiting
-        if (error.message && error.message.includes("429")) {
-          setErrorMessage("CoinGecko API rate limit reached. Using estimated rates.")
-        } else {
-          setErrorMessage(error.message || "Failed to fetch exchange rates")
-        }
-
+        setErrorMessage(error.message || "Failed to get exchange estimate")
         setUsingFallbackRates(true)
-
-        // For rate limiting, use a longer retry delay
-        const retryDelay = error.message && error.message.includes("429") ? 30000 : 5000
 
         // Schedule a retry after a delay
         if (retryTimeoutRef.current) {
@@ -170,31 +159,21 @@ export default function SwapPage() {
         }
 
         retryTimeoutRef.current = setTimeout(() => {
-          console.log(`Retrying rate fetch after error... (Delay: ${retryDelay / 1000}s)`)
-          fetchRates(customFromToken, customToToken)
-        }, retryDelay)
+          console.log(`Retrying estimate fetch after error...`)
+          fetchEstimate(customFromToken, customToToken, amount)
+        }, 5000)
       } finally {
         setIsLoading(false)
       }
     },
-    [fromToken, toToken, calculateMinimumAmount],
+    [fromToken, toToken, fromAmount],
   )
 
-  useEffect(() => {
-    if (fromRate > 0 && toRate > 0 && fromAmount > 0) {
-      const fromValueInUsd = fromAmount * fromRate
-      const feeAmount = fromValueInUsd * 0.001
-      const adjustedValueInUsd = Math.max(0, fromValueInUsd - feeAmount)
-      const toTokenAmount = adjustedValueInUsd / toRate
-      setToAmount(toTokenAmount)
-    } else if (!fromAmount || fromAmount === 0) {
-      setToAmount(0)
-    }
-  }, [fromRate, toRate, fromAmount])
+  // This effect is no longer needed as we use ChangeNOW estimates directly
 
   useEffect(() => {
-    calculateMinimumAmount()
-  }, [calculateMinimumAmount, fromToken, fromRate])
+    fetchMinimumAmount()
+  }, [fetchMinimumAmount])
 
   useEffect(() => {
     const numValue = Number.parseFloat(fromAmount) || 0
@@ -206,7 +185,9 @@ export default function SwapPage() {
   }, [fromAmount, minimumTokenAmount])
 
   useEffect(() => {
-    fetchRates()
+    if (fromAmount && parseFloat(fromAmount) > 0) {
+      fetchEstimate()
+    }
 
     return () => {
       if (fetchIntervalRef.current) {
@@ -216,7 +197,7 @@ export default function SwapPage() {
         clearTimeout(retryTimeoutRef.current)
       }
     }
-  }, [fetchRates])
+  }, [fetchEstimate])
 
   const handleFromAmountChange = (e) => {
     const rawValue = e.target.value
@@ -234,14 +215,13 @@ export default function SwapPage() {
 
     setFromAmount(rawValue)
 
-    const numValue = Number.parseFloat(rawValue) || 0
+    const numValue = parseFloat(rawValue) || 0
 
-    if (fromRate > 0 && toRate > 0) {
-      const fromValueInUsd = numValue * fromRate
-      const feeAmount = fromValueInUsd * 0.001
-      const adjustedValueInUsd = Math.max(0, fromValueInUsd - feeAmount)
-      const toTokenAmount = adjustedValueInUsd / toRate
-      setToAmount(toTokenAmount)
+    if (numValue > 0) {
+      // Get real estimate from ChangeNOW
+      fetchEstimate(null, null, rawValue)
+    } else {
+      setToAmount(0)
     }
 
     if (numValue > 0 && numValue < minimumTokenAmount) {
@@ -261,10 +241,13 @@ export default function SwapPage() {
     setIsTokenChanging(true)
     setToAmount(0)
 
-    if (token.id === toToken.id) {
-      fetchRates(token, fromToken)
-    } else {
-      fetchRates(token, toToken)
+    // Get new estimate with updated token
+    if (fromAmount && parseFloat(fromAmount) > 0) {
+      if (token.id === toToken.id) {
+        fetchEstimate(token, fromToken, fromAmount)
+      } else {
+        fetchEstimate(token, toToken, fromAmount)
+      }
     }
   }
 
@@ -278,10 +261,13 @@ export default function SwapPage() {
     setIsTokenChanging(true)
     setToAmount(0)
 
-    if (token.id === fromToken.id) {
-      fetchRates(toToken, token)
-    } else {
-      fetchRates(fromToken, token)
+    // Get new estimate with updated token
+    if (fromAmount && parseFloat(fromAmount) > 0) {
+      if (token.id === fromToken.id) {
+        fetchEstimate(toToken, token, fromAmount)
+      } else {
+        fetchEstimate(fromToken, token, fromAmount)
+      }
     }
   }
 
@@ -295,12 +281,16 @@ export default function SwapPage() {
     setIsTokenChanging(true)
     setToAmount(0)
 
-    fetchRates(newFromToken, newToToken)
+    if (fromAmount && parseFloat(fromAmount) > 0) {
+      fetchEstimate(newFromToken, newToToken, fromAmount)
+    }
   }
 
   const handleRefreshRates = () => {
     setIsTokenChanging(true)
-    fetchRates()
+    if (fromAmount && parseFloat(fromAmount) > 0) {
+      fetchEstimate()
+    }
   }
 
   const validateWalletAddress = () => {
@@ -448,12 +438,12 @@ export default function SwapPage() {
                 </h1>
 
                 <p className="text-gray-400 mb-4 text-sm">
-                  Enter the realm of next-generation crypto trading with FlowBit— a revolutionary platform where over
+                  Enter the realm of next-generation crypto trading with Flow Swap— a revolutionary platform where over
                   600 tokens await your instant swap without any wallet connection.
                 </p>
 
                 <p className="text-gray-400 mb-4 text-sm">
-                  Designed with cutting-edge technology and an intuitive interface, FlowBit offers lightning-fast,
+                  Designed with cutting-edge technology and an intuitive interface, Flow Swap offers lightning-fast,
                   secure transactions that simplify your trading experience while maintaining the highest standards of
                   reliability.
                 </p>
@@ -465,7 +455,7 @@ export default function SwapPage() {
 
                 <div className="flex space-x-3">
                   <a
-                    href="https://flowbit.gitbook.io/flowbit/"
+                    href="https://flowswap.gitbook.io/flowswap/"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-center bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors text-sm"
@@ -473,10 +463,15 @@ export default function SwapPage() {
                     <FileText className="mr-1.5 h-4 w-4" />
                     Read Documentation
                   </a>
-                  <button className="flex items-center bg-transparent border border-gray-700 hover:bg-gray-800/30 text-white px-4 py-2 rounded-lg transition-colors text-sm">
+                  <a
+                    href="https://x.com/Officialflows"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center bg-transparent border border-gray-700 hover:bg-gray-800/30 text-white px-4 py-2 rounded-lg transition-colors text-sm"
+                  >
                     <Twitter className="mr-1.5 h-4 w-4" />
                     Twitter
-                  </button>
+                  </a>
                 </div>
               </div>
             </div>
@@ -543,28 +538,7 @@ export default function SwapPage() {
                       {toAmount === 0 ? "0.00" : toAmount.toFixed(8)}
                     </div>
                   </div>
-                  <div className="mt-2 text-xs text-gray-400 flex items-center justify-between">
-                    <div className="flex items-center">
-                      <span className="inline-block w-1.5 h-1.5 bg-blue-400 rounded-full mr-1.5"></span>
-                      Chain:{" "}
-                      {toToken.name === "Bitcoin"
-                        ? "Bitcoin Network"
-                        : toToken.name === "Solana"
-                          ? "Solana"
-                          : toToken.symbol.toUpperCase() === "ETH"
-                            ? "Ethereum"
-                            : toToken.symbol.toUpperCase() === "BNB"
-                              ? "BNB Smart Chain"
-                              : toToken.symbol.toUpperCase() === "MATIC"
-                                ? "Polygon"
-                                : toToken.symbol.toUpperCase() === "AVAX"
-                                  ? "Avalanche C-Chain"
-                                  : toToken.symbol.toUpperCase() === "ARB"
-                                    ? "Arbitrum One"
-                                    : toToken.symbol.toUpperCase() === "OP"
-                                      ? "Optimism"
-                                      : "Ethereum"}
-                    </div>
+                  <div className="mt-2 text-xs text-gray-400 flex items-center justify-end">
                     <button
                       onClick={handleRefreshRates}
                       disabled={isLoading}
@@ -683,9 +657,6 @@ export default function SwapPage() {
           <HowToUseSection />
         </div>
 
-        <div className="w-full md:ml-[270px]">
-          <TokenDataSection />
-        </div>
 
         <div className="w-full md:ml-[270px]">
           <MentexSection />

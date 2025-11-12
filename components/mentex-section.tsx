@@ -141,12 +141,12 @@ export default function MentexSection() {
 
             <div className="text-sm text-gray-500">
               2024 © powered by{" "}
-              <a href="#" className="text-gray-400 hover:text-white transition-colors">
-                flowbit
+              <a href="https://x.com/Officialflows" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-white transition-colors">
+                Flow Swap
               </a>{" "}
               • Website by{" "}
-              <a href="#" className="text-gray-400 hover:text-white transition-colors">
-                flowbit team
+              <a href="https://x.com/Officialflows" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-white transition-colors">
+                Flow Swap Team
               </a>
             </div>
           </div>

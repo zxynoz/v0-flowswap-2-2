@@ -38,7 +38,96 @@ export default function TransactionModal({
   const [depositAddress, setDepositAddress] = useState("")
   const [autoCheckEnabled, setAutoCheckEnabled] = useState(false)
   const autoCheckIntervalRef = useRef<NodeJS.Timeout | null>(null)
-  const [transactions, setTransactions] = useLocalStorage<any[]>("neonswap-transactions", [])
+  const [transactions, setTransactions] = useLocalStorage<any[]>("flowswap-transactions", [])
+  const [isCreatingTransaction, setIsCreatingTransaction] = useState(false)
+  const [realTransactionData, setRealTransactionData] = useState<any>(null)
+
+  // Create real ChangeNOW transaction
+  const createRealTransaction = async () => {
+    setIsCreatingTransaction(true)
+    setTransactionStatus("Creating transaction...")
+    
+    try {
+      const response = await fetch('/api/changenow/create-transaction', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          fromCurrency: fromToken.symbol.toLowerCase(),
+          toCurrency: toToken.symbol.toLowerCase(),
+          fromAmount: fromAmount,
+          address: recipientAddress,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (response.ok && data.id) {
+        // Real ChangeNOW transaction created
+        setRealTransactionData(data)
+        setTransactionId(data.id)
+        setDepositAddress(data.payinAddress)
+        setTransactionStatus("Waiting for your deposit")
+        setProgressPercentage(25)
+
+        // Save real transaction to local storage
+        const newTransaction = {
+          id: data.id,
+          fromAmount,
+          fromToken,
+          toAmount,
+          toToken,
+          depositAddress: data.payinAddress,
+          recipientAddress,
+          status: "waiting",
+          confirmations: 0,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          changeNowData: data,
+        }
+
+        setTransactions([newTransaction, ...transactions])
+      } else {
+        throw new Error(data.message || 'Failed to create transaction')
+      }
+    } catch (error) {
+      console.error('Error creating ChangeNOW transaction:', error)
+      setTransactionStatus("⚠️ Failed to create transaction")
+      
+      // Fallback to demo transaction
+      const fallbackId = `demo_${Math.random().toString(36).substring(2, 10)}`
+      setTransactionId(fallbackId)
+      
+      const fallbackAddress = fromToken.symbol.toLowerCase() === "btc"
+        ? "bc1qfl4svl3rkfw8d09naamyt7k6wrz903caq3684s"
+        : fromToken.symbol.toLowerCase() === "sol"
+          ? "739jDqQeuewnq3yYRu4tWvtknZ6AtJ5aivL9d6uiJyzk"
+          : "0x731e64bd31a37B05e412c8D45971A79d1ffe58c7"
+      
+      setDepositAddress(fallbackAddress)
+      setTransactionStatus("Waiting for your deposit (Demo Mode)")
+      
+      const fallbackTransaction = {
+        id: fallbackId,
+        fromAmount,
+        fromToken,
+        toAmount,
+        toToken,
+        depositAddress: fallbackAddress,
+        recipientAddress,
+        status: "waiting",
+        confirmations: 0,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        isDemo: true,
+      }
+
+      setTransactions([fallbackTransaction, ...transactions])
+    } finally {
+      setIsCreatingTransaction(false)
+    }
+  }
 
   // Generate transaction ID and deposit address when modal opens
   useEffect(() => {
@@ -94,20 +183,8 @@ export default function TransactionModal({
           setTransactionStatus("⚠️ Error Checking Transaction")
         }
       } else {
-        // Generate a new transaction
-        newTransactionId = `${Math.random().toString(36).substring(2, 10)}...${Math.random().toString(36).substring(2, 10)}`
-        setTransactionId(newTransactionId)
-
-        // Generate a deposit address based on token type
-        newDepositAddress =
-          fromToken.symbol.toLowerCase() === "btc"
-            ? "bc1qfl4svl3rkfw8d09naamyt7k6wrz903caq3684s"
-            : fromToken.symbol.toLowerCase() === "sol"
-              ? "739jDqQeuewnq3yYRu4tWvtknZ6AtJ5aivL9d6uiJyzk"
-              : fromToken.symbol.toLowerCase() === "usdc"
-                ? "739jDqQeuewnq3yYRu4tWvtknZ6AtJ5aivL9d6uiJyzk"
-                : "0x731e64bd31a37B05e412c8D45971A79d1ffe58c7" // Default to ETH address
-        setDepositAddress(newDepositAddress)
+        // Create real ChangeNOW transaction
+        createRealTransaction()
 
         // Save new transaction to local storage
         const newTransaction = {
@@ -158,11 +235,65 @@ export default function TransactionModal({
     setCheckCount((prevCount) => prevCount + 1)
 
     try {
-      // For demonstration purposes, we'll simulate an API call
-      // In a real app, you would use the actual txHash and API
-      // const response = await axios.get(`https://api.blockcypher.com/v1/btc/main/txs/${txHash}`)
-
-      // Simulate API response with a more realistic flow
+      // Check real ChangeNOW transaction status if we have real transaction data
+      if (realTransactionData && realTransactionData.id) {
+        const response = await fetch(`/api/changenow/transaction-status?id=${realTransactionData.id}`)
+        const data = await response.json()
+        
+        if (response.ok && data.status) {
+          // Update status based on ChangeNOW response
+          switch (data.status) {
+            case 'waiting':
+              setTransactionStatus("Waiting for your deposit")
+              setProgressPercentage(25)
+              break
+            case 'confirming':
+            case 'exchanging':
+              setTransactionStatus("⏳ Transaction processing...")
+              setProgressPercentage(60)
+              setDepositDetected(true)
+              break
+            case 'sending':
+              setTransactionStatus("⏳ Sending to recipient...")
+              setProgressPercentage(90)
+              break
+            case 'finished':
+              setTransactionStatus("✅ Transaction Completed!")
+              setProgressPercentage(100)
+              setAutoCheckEnabled(false)
+              if (autoCheckIntervalRef.current) {
+                clearInterval(autoCheckIntervalRef.current)
+                autoCheckIntervalRef.current = null
+              }
+              break
+            case 'failed':
+            case 'refunded':
+              setTransactionStatus("⚠️ Transaction Failed")
+              setAutoCheckEnabled(false)
+              break
+            default:
+              setTransactionStatus(`Status: ${data.status}`)
+          }
+          
+          // Update transaction in storage
+          const updatedTransactions = transactions.map((tx) => {
+            if (tx.id === transactionId) {
+              return {
+                ...tx,
+                status: data.status,
+                updatedAt: new Date().toISOString(),
+                changeNowStatus: data,
+              }
+            }
+            return tx
+          })
+          setTransactions(updatedTransactions)
+          
+          return
+        }
+      }
+      
+      // Fallback to demo simulation
       await new Promise((resolve) => setTimeout(resolve, 1500))
 
       // First check - no deposit detected

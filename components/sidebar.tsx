@@ -71,15 +71,15 @@ export default function Sidebar() {
             </Link>
 
             <Link
-              href="/analyzer"
+              href="/analytics"
               className={`flex items-center relative overflow-hidden transition-all duration-300 ${
-                pathname === "/analyzer" ? activeLinkClass : "text-gray-400 hover:text-white hover:bg-gray-800/20"
+                pathname === "/analytics" ? activeLinkClass : "text-gray-400 hover:text-white hover:bg-gray-800/20"
               } px-4 py-2 rounded-lg transition-colors`}
             >
               <BarChart3
-                className={`mr-3 h-5 w-5 transition-transform duration-300 ${pathname === "/analyzer" ? "scale-110" : ""}`}
+                className={`mr-3 h-5 w-5 transition-transform duration-300 ${pathname === "/analytics" ? "scale-110" : ""}`}
               />
-              <span>Analyzer</span>
+              <span>Analytics</span>
             </Link>
 
             <div className="flex items-center text-gray-400 px-4 py-2 rounded-lg">
@@ -91,7 +91,7 @@ export default function Sidebar() {
 
           <div className="pt-6 border-t border-gray-800/20 space-y-1">
             <Link
-              href="https://flowbit.gitbook.io/flowbit/"
+              href="https://flowswap.gitbook.io/flowswap/"
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center text-gray-400 hover:text-white px-4 py-2 rounded-lg hover:bg-gray-800/20 transition-all duration-300"
@@ -101,7 +101,9 @@ export default function Sidebar() {
             </Link>
 
             <Link
-              href=""
+              href="https://x.com/Officialflows"
+              target="_blank"
+              rel="noopener noreferrer"
               className="flex items-center text-gray-400 hover:text-white px-4 py-2 rounded-lg hover:bg-gray-800/20 transition-all duration-300"
             >
               <Twitter className="mr-3 h-5 w-5" />

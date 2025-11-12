@@ -24,7 +24,7 @@ export default function MobileHeader() {
       <div className="md:hidden fixed top-0 left-0 right-0 z-50 bg-[#0a0b14] border-b border-gray-800/20 backdrop-blur-lg">
         <div className="flex items-center justify-between p-4">
           <Link href="/" className="text-white font-bold text-xl">
-            Fswap
+            Flow Swap
           </Link>
           <button onClick={() => setIsOpen(!isOpen)} className="text-white">
             {isOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}

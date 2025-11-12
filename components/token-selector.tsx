@@ -16,7 +16,7 @@ const TokenSelector = ({ onSelectToken, onClose }) => {
       setError(null)
 
       try {
-        const res = await fetch(`/api/tokens?_=${Date.now()}`, {
+        const res = await fetch(`/api/changenow/currencies?_=${Date.now()}`, {
           cache: "no-store",
           headers: {
             "Cache-Control": "no-cache",
@@ -29,28 +29,36 @@ const TokenSelector = ({ onSelectToken, onClose }) => {
 
         // Validate that we received an array of tokens
         if (Array.isArray(data) && data.length > 0) {
-          // Validate token structure
-          const validTokens = data.filter(
-            (token) => token && typeof token === "object" && token.id && token.symbol && token.name,
-          )
+          // Transform ChangeNOW currency format to our token format
+          const validTokens = data
+            .filter((currency) => currency && currency.ticker && currency.name)
+            .map((currency) => ({
+              id: currency.ticker,
+              symbol: currency.ticker,
+              name: currency.name,
+              image: currency.image || `https://assets.coingecko.com/coins/images/1/large/${currency.ticker}.png`,
+              current_price: 0,
+              price_change_percentage_24h: 0,
+              market_cap: 0,
+            }))
 
           if (validTokens.length > 0) {
             setTokens(validTokens)
             setError(null)
-            console.log(`[v0] Successfully loaded ${validTokens.length} tokens`)
+            console.log(`[ChangeNOW] Successfully loaded ${validTokens.length} currencies`)
             setIsLoading(false)
             return
           }
         }
 
         // If we get here, data is not valid
-        throw new Error("Invalid token data received from API")
+        throw new Error("Invalid currency data received from ChangeNOW API")
       } catch (error) {
-        console.error("[v0] Error fetching tokens:", error.message)
+        console.error("[ChangeNOW] Error fetching currencies:", error.message)
 
         // Only show error if we don't have tokens already
         if (tokens.length === 0) {
-          setError("Unable to load token data. Please try again.")
+          setError("Unable to load currency data. Please try again.")
         }
       } finally {
         setIsLoading(false)
@@ -65,9 +73,15 @@ const TokenSelector = ({ onSelectToken, onClose }) => {
   }
 
   const filteredTokens = tokens.filter(
-    (token) =>
-      token.name?.toLowerCase().includes(search.toLowerCase()) ||
-      token.symbol?.toLowerCase().includes(search.toLowerCase()),
+    (token) => {
+      if (!search.trim()) return true
+      const searchLower = search.toLowerCase().trim()
+      return (
+        token.name?.toLowerCase().includes(searchLower) ||
+        token.symbol?.toLowerCase().includes(searchLower) ||
+        token.id?.toLowerCase().includes(searchLower)
+      )
+    }
   )
 
   return (

@@ -29,7 +29,7 @@ interface Transaction {
 }
 
 export default function TransactionsPage() {
-  const [transactions, setTransactions] = useLocalStorage<Transaction[]>("neonswap-transactions", [])
+  const [transactions, setTransactions] = useLocalStorage<Transaction[]>("flowswap-transactions", [])
   const [isCheckingStatus, setIsCheckingStatus] = useState<Record<string, boolean>>({})
   const [copied, setCopied] = useState<string | null>(null)
 

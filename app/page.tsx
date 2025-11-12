@@ -51,7 +51,7 @@ export default function HomePage() {
 
                 {/* Main Heading */}
                 <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white leading-tight">
-                  Fswap - faster than
+                  Flow Swap - faster than
                   <br />
                   you think
                 </h1>
@@ -66,7 +66,7 @@ export default function HomePage() {
                     whileTap={{ scale: 0.95 }}
                     className="bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-600 text-white px-8 py-3 rounded-xl font-medium text-base transition-all shadow-lg shadow-blue-500/30"
                   >
-                    Exhchange
+                    Exchange
                   </motion.button>
                 </Link>
               </motion.div>
