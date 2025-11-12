@@ -91,7 +91,7 @@ export default function Sidebar() {
 
           <div className="pt-6 border-t border-gray-800/20 space-y-1">
             <Link
-              href="https://flowswap.gitbook.io/flowswap/"
+              href="https://doc.flowswap.app/"
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center text-gray-400 hover:text-white px-4 py-2 rounded-lg hover:bg-gray-800/20 transition-all duration-300"
